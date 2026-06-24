@@ -469,11 +469,25 @@ Respond with ONLY valid JSON, no markdown fences, no explanation, nothing else.
       }
       const data = await res.json();
       const raw = data.text || "";
+      // Strip markdown fences
       const clean = raw.replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(clean);
+      // Find the outermost JSON object even if response is truncated
+      const start = clean.indexOf("{");
+      const end = clean.lastIndexOf("}");
+      if (start === -1 || end === -1) throw new Error("No JSON object found in response");
+      const jsonStr = clean.slice(start, end + 1);
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonStr);
+      } catch (parseErr) {
+        // Last resort: try to extract what we have with a relaxed parse
+        console.error("Parse error, raw response:", raw);
+        throw new Error("Could not parse response JSON: " + parseErr.message);
+      }
+      if (!parsed.scenes || parsed.scenes.length === 0) throw new Error("No scenes in response");
       setStoryboard(parsed);
     } catch (e) {
-      setError("Failed to generate storyboard. Check your input and try again.");
+      setError("Failed to generate storyboard: " + e.message);
       console.error(e);
     }
     clearInterval(msgTimer);
